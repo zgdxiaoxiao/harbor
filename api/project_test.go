@@ -2,10 +2,10 @@ package api
 
 import (
 	"fmt"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware/harbor/tests/apitests/apilib"
+	"testing"
+	"time"
 )
 
 func TestAddProject(t *testing.T) {
@@ -22,7 +22,7 @@ func TestAddProject(t *testing.T) {
 	prjUsr := &usrInfo{"unknown", "unknown"}
 
 	var project apilib.Project
-	project.ProjectName = "test_project"
+	project.ProjectName = "3tesproject"
 	project.Public = true
 
 	//case 1: admin not login, expect project creation fail.
@@ -60,6 +60,87 @@ func TestAddProject(t *testing.T) {
 	} else {
 		assert.Equal(result, int(409), "Case 3: Project creation status should be 409")
 		//t.Log(result)
+	}
+
+}
+
+func TestProGet(t *testing.T) {
+	fmt.Println("Test for Project GET API")
+	assert := assert.New(t)
+
+	apiTest := newHarborAPI()
+	var result []apilib.SearchProject
+
+	httpStatusCode, result, err := apiTest.ProjectsGet("library", 1)
+	if err != nil {
+		t.Error("Error while search project by proName and isPublic", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+		assert.Equal(int64(0), result[0].Id, "Project id should be equal")
+		assert.Equal("library", result[0].Name, "Project name should be library")
+		assert.Equal(int32(1), result[0].Public, "Project public status should be 1 (true)")
+	}
+
+}
+
+func TestToggleProjectPublicity(t *testing.T) {
+	fmt.Println("Test for Project PUT API: Update properties for a selected project")
+	assert := assert.New(t)
+
+	apiTest := newHarborAPI()
+
+	admin := &usrInfo{"admin", "Harbor12345"}
+
+	//-------------------case1: Response Code=200------------------------------//
+	httpStatusCode, err := apiTest.ToggleProjectPublicity(*admin, "1", true)
+	if err != nil {
+		t.Error("Error while search project by proId", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	}
+	//-------------------case2: Response Code=404 Not found the project------------------------------//
+	httpStatusCode, err = apiTest.ToggleProjectPublicity(*admin, "0", true)
+	if err != nil {
+		t.Error("Error while search project by proId", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 401")
+	}
+	/*
+		//-------------------case3: Response Code=400 Invalid project id ------------------------------//
+		httpStatusCode, result, err = apiTest.ProjectGetByPk("cc")
+		if err != nil {
+			t.Error("Error while search project by proId", err.Error())
+			t.Log(err)
+		} else {
+			assert.Equal(int(400), httpStatusCode, "httpStatusCode should be 400")
+		}
+	*/
+
+}
+func TestProjectLogsFilter(t *testing.T) {
+	fmt.Println("Test for search access logs filtered by operations and date time ranges..")
+	assert := assert.New(t)
+
+	apiTest := newHarborAPI()
+	admin := &usrInfo{"admin", "Harbor12345"}
+	endTimestamp := time.Now().Unix()
+	startTimestamp := endTimestamp - 3600
+	accessLog := &apilib.AccessLogFilter{
+		Username:       "admin",
+		Keywords:       "",
+		BeginTimestamp: startTimestamp,
+		EndTimestamp:   endTimestamp,
+	}
+	projectId := "1"
+	httpStatusCode, _, err := apiTest.ProjectLogsFilter(*admin, projectId, *accessLog)
+	if err != nil {
+		t.Error("Error while search access logs")
+		t.Log(err)
+	} else {
+		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
 	}
 
 }

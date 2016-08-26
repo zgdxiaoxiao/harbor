@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/vmware/harbor/tests/apitests/apilib"
 	"github.com/vmware/harbor/dao"
 	"github.com/vmware/harbor/models"
+	"github.com/vmware/harbor/tests/apitests/apilib"
 
 	"github.com/astaxie/beego"
 	"github.com/dghubble/sling"
@@ -20,6 +20,11 @@ import (
 	//for test env prepare
 	_ "github.com/vmware/harbor/auth/db"
 	_ "github.com/vmware/harbor/auth/ldap"
+)
+
+const (
+	JSON_ACCEPT_HEADER = "application/json"
+	TEXT_ACCEPT_HEADER = "text/plain"
 )
 
 type api struct {
@@ -53,8 +58,37 @@ func init() {
 	beego.Router("/api/search/", &SearchAPI{})
 	beego.Router("/api/projects/", &ProjectAPI{}, "get:List;post:Post")
 	beego.Router("/api/users/:id([0-9]+)/password", &UserAPI{}, "put:ChangePassword")
+	beego.Router("/api/projects/:id/publicity", &ProjectAPI{}, "put:ToggleProjectPublic")
+	beego.Router("/api/projects/:id([0-9]+)/logs/filter", &ProjectAPI{}, "post:FilterAccessLog")
 
 	_ = updateInitPassword(1, "Harbor12345")
+
+}
+
+func request(_sling *sling.Sling, acceptHeader string) (int, []byte, error) {
+	_sling = _sling.Set("Accept", acceptHeader)
+	req, err := _sling.Request()
+	if err != nil {
+		return 400, nil, err
+	}
+	w := httptest.NewRecorder()
+	beego.BeeApp.Handlers.ServeHTTP(w, req)
+	body, err := ioutil.ReadAll(w.Body)
+	return w.Code, body, err
+}
+
+func authRequest(_sling *sling.Sling, acceptHeader string, authInfo usrInfo) (int, []byte, error) {
+	_sling = _sling.Set("Accept", acceptHeader)
+	req, err := _sling.Request()
+	if err != nil {
+		return 400, nil, err
+	}
+
+	req.SetBasicAuth(authInfo.Name, authInfo.Passwd)
+	w := httptest.NewRecorder()
+	beego.BeeApp.Handlers.ServeHTTP(w, req)
+	body, err := ioutil.ReadAll(w.Body)
+	return w.Code, body, err
 
 }
 
@@ -80,22 +114,7 @@ func (a api) SearchGet(q string) (apilib.Search, error) {
 
 	_sling = _sling.QueryStruct(&QueryParams{Query: q})
 
-	accepts := []string{"application/json", "text/plain"}
-	for key := range accepts {
-		_sling = _sling.Set("Accept", accepts[key])
-		break // only use the first Accept
-	}
-
-	req, err := _sling.Request()
-
-	w := httptest.NewRecorder()
-
-	beego.BeeApp.Handlers.ServeHTTP(w, req)
-
-	body, err := ioutil.ReadAll(w.Body)
-	if err != nil {
-		// handle error
-	}
+	_, body, err := request(_sling, JSON_ACCEPT_HEADER)
 
 	var successPayload = new(apilib.Search)
 	err = json.Unmarshal(body, &successPayload)
@@ -117,24 +136,10 @@ func (a api) ProjectsPost(prjUsr usrInfo, project apilib.Project) (int, error) {
 
 	_sling = _sling.Path(path)
 
-	// accept header
-	accepts := []string{"application/json", "text/plain"}
-	for key := range accepts {
-		_sling = _sling.Set("Accept", accepts[key])
-		break // only use the first Accept
-	}
-
 	// body params
 	_sling = _sling.BodyJSON(project)
-	//fmt.Printf("project post req: %+v\n", _sling)
-	req, err := _sling.Request()
-	req.SetBasicAuth(prjUsr.Name, prjUsr.Passwd)
-
-	w := httptest.NewRecorder()
-
-	beego.BeeApp.Handlers.ServeHTTP(w, req)
-
-	return w.Code, err
+	httpStatusCode, _, err := authRequest(_sling, JSON_ACCEPT_HEADER, prjUsr)
+	return httpStatusCode, err
 }
 
 //Change password
@@ -154,27 +159,11 @@ func (a api) UsersUserIDPasswordPut(user usrInfo, userID int32, password apilib.
 	fmt.Printf("password %+v\n", password)
 	_sling = _sling.Path(path)
 
-	// accept header
-	accepts := []string{"application/json", "text/plain"}
-	for key := range accepts {
-		_sling = _sling.Set("Accept", accepts[key])
-		break // only use the first Accept
-	}
-
 	// body params
 	_sling = _sling.BodyJSON(password)
-	fmt.Printf("project post req: %+v\n", _sling)
-	req, err := _sling.Request()
-	req.SetBasicAuth(user.Name, user.Passwd)
-	fmt.Printf("project post req: %+v\n", req)
-	if err != nil {
-		// handle error
-	}
-	w := httptest.NewRecorder()
 
-	beego.BeeApp.Handlers.ServeHTTP(w, req)
-
-	return w.Code
+	httpStatusCode, _, _ := authRequest(_sling, JSON_ACCEPT_HEADER, user)
+	return httpStatusCode
 
 }
 
@@ -184,8 +173,8 @@ func (a api) UsersUserIDPasswordPut(user usrInfo, userID int32, password apilib.
 ////@param repoName The name of repository which will be deleted.
 ////@param tag Tag of a repository.
 ////@return void
-////func (a HarborAPI) RepositoriesDelete(prjUsr UsrInfo, repoName string, tag string) (int, error) {
-//func (a HarborAPI) RepositoriesDelete(prjUsr UsrInfo, repoName string, tag string) (int, error) {
+////func (a api) RepositoriesDelete(prjUsr UsrInfo, repoName string, tag string) (int, error) {
+//func (a api) RepositoriesDelete(prjUsr UsrInfo, repoName string, tag string) (int, error) {
 //	_sling := sling.New().Delete(a.basePath)
 
 //	// create path and map variables
@@ -219,6 +208,98 @@ func (a api) UsersUserIDPasswordPut(user usrInfo, userID int32, password apilib.
 //	}
 //	return httpResponse.StatusCode, err
 //}
+
+//Search projects by projectName and isPublic
+func (a api) ProjectsGet(projectName string, isPublic int32) (int, []apilib.SearchProject, error) {
+	_sling := sling.New().Get(a.basePath)
+
+	//create api path
+	path := "api/projects"
+	_sling = _sling.Path(path)
+	type QueryParams struct {
+		ProjectName string `url:"project_name,omitempty"`
+		IsPubilc    int32  `url:"is_public,omitempty"`
+	}
+	_sling = _sling.QueryStruct(&QueryParams{ProjectName: projectName, IsPubilc: isPublic})
+
+	var successPayload []apilib.SearchProject
+
+	httpStatusCode, body, err := request(_sling, JSON_ACCEPT_HEADER)
+	if err == nil && httpStatusCode == 200 {
+		err = json.Unmarshal(body, &successPayload)
+	}
+
+	return httpStatusCode, successPayload, err
+}
+
+//Update properties for a selected project.
+func (a api) ToggleProjectPublicity(prjUsr usrInfo, projectId string, ispublic bool) (int, error) {
+	// create path and map variables
+	path := "/api/projects/" + projectId + "/publicity/"
+	_sling := sling.New().Put(a.basePath)
+
+	_sling = _sling.Path(path)
+
+	type QueryParams struct {
+		Public bool `json:"public,omitempty"`
+	}
+
+	_sling = _sling.BodyJSON(&QueryParams{Public: ispublic})
+
+	httpStatusCode, _, err := authRequest(_sling, JSON_ACCEPT_HEADER, prjUsr)
+	return httpStatusCode, err
+
+}
+
+//Get access logs accompany with a relevant project.
+func (a api) ProjectLogsFilter(prjUsr usrInfo, projectId string, accessLog apilib.AccessLogFilter) (int, []byte, error) {
+	//func (a api) ProjectLogsFilter(prjUsr usrInfo, projectId string, accessLog apilib.AccessLog) (int, apilib.AccessLog, error) {
+	_sling := sling.New().Post(a.basePath)
+
+	path := "/api/projects/" + projectId + "/logs/filter"
+
+	_sling = _sling.Path(path)
+
+	// body params
+	_sling = _sling.BodyJSON(accessLog)
+
+	//	var successPayload []apilib.AccessLog
+
+	httpStatusCode, body, err := authRequest(_sling, JSON_ACCEPT_HEADER, prjUsr)
+	/*
+		if err == nil && httpStatusCode == 200 {
+			err = json.Unmarshal(body, &successPayload)
+		}
+	*/
+	return httpStatusCode, body, err
+	//	return httpStatusCode, successPayload, err
+}
+
+//Return relevant role members of projectId
+func (a api) GetProjectMembersByProId(prjUsr usrInfo, projectId string) (int, []byte, error) {
+	_sling := sling.New().Post(a.basePath)
+
+	path := "/api/projects/" + projectId + "/members/"
+
+	_sling = _sling.Path(path)
+
+	httpStatusCode, body, err := authRequest(_sling, JSON_ACCEPT_HEADER, prjUsr)
+	return httpStatusCode, body, err
+
+}
+
+//Add project role member accompany with  projectId
+func (a api) AddProjectMember(prjUsr usrInfo, projectId string, roles apilib.RoleParam) (int, []byte, error) {
+	_sling := sling.New().Post(a.basePath)
+
+	path := "/api/projects/" + projectId + "/members/"
+
+	_sling = _sling.Path(path)
+
+	httpStatusCode, body, err := authRequest(_sling, JSON_ACCEPT_HEADER, prjUsr)
+	return httpStatusCode, body, err
+
+}
 
 //Return projects created by Harbor
 //func (a HarborApi) ProjectsGet (projectName string, isPublic int32) ([]Project, error) {
