@@ -22,7 +22,7 @@ func TestAddProject(t *testing.T) {
 	prjUsr := &usrInfo{"unknown", "unknown"}
 
 	var project apilib.Project
-	project.ProjectName = "testproject"
+	project.ProjectName = "test_project"
 	project.Public = true
 
 	//case 1: admin not login, expect project creation fail.
