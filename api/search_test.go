@@ -9,13 +9,12 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	fmt.Println("Testing Search(SearchGet) API")
+	fmt.Println("\nTesting Search(SearchGet) API")
 	assert := assert.New(t)
 
 	apiTest := newHarborAPI()
 	var result apilib.Search
 	result, err := apiTest.SearchGet("library")
-	//fmt.Printf("%+v\n", result)
 	if err != nil {
 		t.Error("Error while search project or repository", err.Error())
 		t.Log(err)
