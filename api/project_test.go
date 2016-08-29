@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+var admin, unknownUsr *usrInfo
+
+func Init() {
+	admin = &usrInfo{"admin", "Harbor12345"}
+	unknownUsr = &usrInfo{"unknown", "unknown"}
+}
+
 func TestAddProject(t *testing.T) {
 
 	fmt.Println("\nTesting Add Project(ProjectsPost) API")
@@ -16,10 +23,7 @@ func TestAddProject(t *testing.T) {
 	apiTest := newHarborAPI()
 
 	//prepare for test
-
-	admin := &usrInfo{"admin", "Harbor12345"}
-
-	prjUsr := &usrInfo{"unknown", "unknown"}
+	Init()
 
 	var project apilib.Project
 	project.ProjectName = "test_project"
@@ -27,7 +31,7 @@ func TestAddProject(t *testing.T) {
 
 	//case 1: admin not login, expect project creation fail.
 
-	result, err := apiTest.ProjectsPost(*prjUsr, project)
+	result, err := apiTest.ProjectsPost(*unknownUsr, project)
 	if err != nil {
 		t.Error("Error while creat project", err.Error())
 		t.Log(err)
@@ -39,9 +43,9 @@ func TestAddProject(t *testing.T) {
 	//case 2: admin successful login, expect project creation success.
 	fmt.Println("case 2: admin successful login, expect project creation success.")
 
-	prjUsr = admin
+	unknownUsr = admin
 
-	result, err = apiTest.ProjectsPost(*prjUsr, project)
+	result, err = apiTest.ProjectsPost(*unknownUsr, project)
 	if err != nil {
 		t.Error("Error while creat project", err.Error())
 		t.Log(err)
@@ -53,7 +57,7 @@ func TestAddProject(t *testing.T) {
 	//case 3: duplicate project name, create project fail
 	fmt.Println("case 3: duplicate project name, create project fail")
 
-	result, err = apiTest.ProjectsPost(*prjUsr, project)
+	result, err = apiTest.ProjectsPost(*unknownUsr, project)
 	if err != nil {
 		t.Error("Error while creat project", err.Error())
 		t.Log(err)
@@ -61,6 +65,48 @@ func TestAddProject(t *testing.T) {
 		assert.Equal(result, int(409), "Case 3: Project creation status should be 409")
 		//t.Log(result)
 	}
+	fmt.Printf("\n")
+
+}
+func TestProHead(t *testing.T) {
+	Init()
+	fmt.Println("\nTest for Project HEAD API")
+	assert := assert.New(t)
+
+	apiTest := newHarborAPI()
+	//admin := &usrInfo{"admin", "Harbor12345"}
+
+	//	unknownUsr := &usrInfo{"unknown", "unknown"}
+
+	//----------------------------case 1 : Response Code=200----------------------------//
+	fmt.Println("case 1: respose code:200")
+	httpStatusCode, err := apiTest.ProjectsHead(*admin, "library")
+	if err != nil {
+		t.Error("Error while search project by proName", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	}
+
+	//----------------------------case 2 : Response Code=404:Project name does not exist.----------------------------//
+	fmt.Println("case 2: respose code:404,Project name does not exist.")
+	httpStatusCode, err = apiTest.ProjectsHead(*admin, "libra")
+	if err != nil {
+		t.Error("Error while search project by proName", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 404")
+	}
+	//----------------------------case 3 : Response Code=401:User need to log in first..----------------------------//
+	fmt.Println("case 3: respose code:401,User need to log in first..")
+	httpStatusCode, err = apiTest.ProjectsHead(*unknownUsr, "libra")
+	if err != nil {
+		t.Error("Error while search project by proName", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(401), httpStatusCode, "httpStatusCode should be 401")
+	}
+
 	fmt.Printf("\n")
 
 }
@@ -103,9 +149,6 @@ func TestToggleProjectPublicity(t *testing.T) {
 
 	apiTest := newHarborAPI()
 
-	admin := &usrInfo{"admin", "Harbor12345"}
-	prjUsr := &usrInfo{"unknown", "unknown"}
-
 	//-------------------case1: Response Code=200------------------------------//
 	fmt.Println("case 1: respose code:200")
 	httpStatusCode, err := apiTest.ToggleProjectPublicity(*admin, "1", true)
@@ -117,7 +160,7 @@ func TestToggleProjectPublicity(t *testing.T) {
 	}
 	//-------------------case2: Response Code=401 User need to log in first. ------------------------------//
 	fmt.Println("case 2: respose code:401, User need to log in first.")
-	httpStatusCode, err = apiTest.ToggleProjectPublicity(*prjUsr, "1", true)
+	httpStatusCode, err = apiTest.ToggleProjectPublicity(*unknownUsr, "1", true)
 	if err != nil {
 		t.Error("Error while search project by proId", err.Error())
 		t.Log(err)
@@ -150,7 +193,7 @@ func TestProjectLogsFilter(t *testing.T) {
 	assert := assert.New(t)
 
 	apiTest := newHarborAPI()
-	admin := &usrInfo{"admin", "Harbor12345"}
+
 	endTimestamp := time.Now().Unix()
 	startTimestamp := endTimestamp - 3600
 	accessLog := &apilib.AccessLogFilter{
@@ -159,6 +202,9 @@ func TestProjectLogsFilter(t *testing.T) {
 		BeginTimestamp: startTimestamp,
 		EndTimestamp:   endTimestamp,
 	}
+
+	//-------------------case1: Response Code=200------------------------------//
+	fmt.Println("case 1: respose code:200")
 	projectId := "1"
 	httpStatusCode, _, err := apiTest.ProjectLogsFilter(*admin, projectId, *accessLog)
 	if err != nil {
@@ -166,6 +212,26 @@ func TestProjectLogsFilter(t *testing.T) {
 		t.Log(err)
 	} else {
 		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	}
+	//-------------------case2: Response Code=401:User need to log in first.------------------------------//
+	fmt.Println("case 2: respose code:401:User need to log in first.")
+	projectId = "1"
+	httpStatusCode, _, err = apiTest.ProjectLogsFilter(*unknownUsr, projectId, *accessLog)
+	if err != nil {
+		t.Error("Error while search access logs")
+		t.Log(err)
+	} else {
+		assert.Equal(int(401), httpStatusCode, "httpStatusCode should be 401")
+	}
+	//-------------------case3: Response Code=404:Project does not exist.-------------------------//
+	fmt.Println("case 3: respose code:404:Illegal format of provided ID value.")
+	projectId = "11111"
+	httpStatusCode, _, err = apiTest.ProjectLogsFilter(*admin, projectId, *accessLog)
+	if err != nil {
+		t.Error("Error while search access logs")
+		t.Log(err)
+	} else {
+		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 404")
 	}
 	fmt.Printf("\n")
 }
