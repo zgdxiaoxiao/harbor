@@ -1,0 +1,112 @@
+version: '2'
+networks:
+  default:
+    driver: overlay
+services:
+  log:
+    build: 
+      context: /home/work/harbor/Deploy/log/
+      dockerfile: Dockerfile
+      args:
+        - constraint:node==node-02
+    restart: always
+    volumes:
+      - /home/work/harbor/log/:/var/log/docker/
+    ports:
+      - 1514:514
+    environment:
+      - "constraint:node==node-02" 
+  registry:
+    image: registry:2.4.0
+    restart: always
+    volumes:
+      - /data/registry:/storage
+      - /home/work/harbor/Deploy/config/registry/:/etc/registry/
+    environment:
+      - GODEBUG=netdns=cgo
+      - reschedule:on-node-failure
+    ports:
+      - 5001:5001
+    command:
+      ["serve", "/etc/registry/config.yml"]
+    depends_on:
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://10.117.4.251:1514"
+        tag: "registry"
+  mysql:
+    build: /home/work/harbor/Deploy/db/
+    restart: always
+    environment:
+      - reschedule:on-node-failure      
+    volumes:
+      - /data/database:/var/lib/mysql
+    env_file:
+      - /home/work/harbor/Deploy/config/db/env
+    depends_on:
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://10.117.4.251:1514"
+        tag: "mysql"
+  ui:
+    build:
+      context: /home/work/harbor/
+      dockerfile: Dockerfile.ui
+    env_file:
+      - /home/work/harbor/Deploy/config/ui/env
+    restart: always
+    environment:
+      - reschedule:on-node-failure      
+    volumes:
+      - /home/work/harbor/Deploy/config/ui/app.conf:/etc/ui/app.conf
+      - /home/work/harbor/Deploy/config/ui/private_key.pem:/etc/ui/private_key.pem
+    depends_on:
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://10.117.4.251:1514"
+        tag: "ui"
+  jobservice:
+    build:
+      context: /home/work/harbor/
+      dockerfile: Dockerfile.job
+    env_file:
+      - /home/work/harbor/Deploy/config/jobservice/env
+    restart: always
+    environment:
+      - reschedule:on-node-failure      
+    volumes:
+      - /data/job_logs:/var/log/jobs
+      - /home/work/harbor/Deploy/config/jobservice/app.conf:/etc/jobservice/app.conf
+    depends_on:
+      - ui
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://10.117.4.251:1514"
+        tag: "jobservice"
+  proxy:
+    image: nginx:1.9
+    restart: always
+    environment:
+      - "constraint:node==node-02" 
+    volumes:
+      - /home/work/harbor/Deploy/config/nginx:/etc/nginx
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - mysql
+      - registry
+      - ui
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://10.117.4.251:1514"
+        tag: "proxy"
