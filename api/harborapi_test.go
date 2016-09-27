@@ -51,6 +51,17 @@ type usrInfo struct {
 	Passwd string
 }
 
+type JobsParams struct {
+	PolicyID   string `url:"policy_id"`
+	Num        string `url:"num"`
+	EndTime    string `"end_time"`
+	StartTime  string `"start_time"`
+	Repository string `"repository"`
+	Status     string `"status"`
+	Page       string `"page"`
+	PageSize   string `"page_size"`
+}
+
 func init() {
 	dao.InitDB()
 	_, file, _, _ := runtime.Caller(1)
@@ -83,6 +94,9 @@ func init() {
 	beego.Router("/api/policies/replication", &RepPolicyAPI{}, "get:List")
 	beego.Router("/api/policies/replication", &RepPolicyAPI{}, "post:Post;delete:Delete")
 	beego.Router("/api/policies/replication/:id([0-9]+)/enablement", &RepPolicyAPI{}, "put:UpdateEnablement")
+	beego.Router("/api/jobs/replication/", &RepJobAPI{}, "get:List")
+	beego.Router("/api/jobs/replication/:id([0-9]+)", &RepJobAPI{})
+	beego.Router("/api/jobs/replication/:id([0-9]+)/log", &RepJobAPI{}, "get:GetLog")
 
 	_ = updateInitPassword(1, "Harbor12345")
 
@@ -661,6 +675,32 @@ func (a api) DeletePolicyByID(authInfo usrInfo, policyID string) (int, error) {
 	_sling := sling.New().Delete(a.basePath)
 
 	path := "/api/policies/replication/" + policyID
+
+	_sling = _sling.Path(path)
+
+	httpStatusCode, _, err := request(_sling, jsonAcceptHeader, authInfo)
+	return httpStatusCode, err
+}
+
+//------------------------------Job Test-------------------------------------//
+
+//List filters jobs according to the policy and repositofunc (a api) GetJobLogsByID(authInfo usrInfo, jobsParams JobsParams) (int, error) {
+func (a api) ListJobs(authInfo usrInfo, jobsParams JobsParams) (int, error) {
+	_sling := sling.New().Get(a.basePath)
+	path := "/api/jobs/replication/"
+
+	_sling = _sling.Path(path)
+	_sling = _sling.QueryStruct(jobsParams)
+
+	httpStatusCode, _, err := request(_sling, jsonAcceptHeader, authInfo)
+	return httpStatusCode, err
+
+}
+
+//let user search job logs filtered by specific ID.
+func (a api) GetJobLogsByID(authInfo usrInfo, repoID string) (int, error) {
+	_sling := sling.New().Get(a.basePath)
+	path := "/api/jobs/replication/" + repoID + "/log/"
 
 	_sling = _sling.Path(path)
 
