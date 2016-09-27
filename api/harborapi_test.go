@@ -54,12 +54,12 @@ type usrInfo struct {
 type JobsParams struct {
 	PolicyID   string `url:"policy_id"`
 	Num        string `url:"num"`
-	EndTime    string `"end_time"`
-	StartTime  string `"start_time"`
-	Repository string `"repository"`
-	Status     string `"status"`
-	Page       string `"page"`
-	PageSize   string `"page_size"`
+	EndTime    string `url:"end_time"`
+	StartTime  string `url:"start_time"`
+	Repository string `url:"repository"`
+	Status     string `url:"status"`
+	Page       string `url:"page"`
+	PageSize   string `url:"page_size"`
 }
 
 func init() {
@@ -492,6 +492,23 @@ func (a api) GetReposTop(authInfo usrInfo, count string) (int, error) {
 	}
 
 	_sling = _sling.QueryStruct(&QueryParams{Count: count})
+	httpStatusCode, _, err := request(_sling, jsonAcceptHeader, authInfo)
+	return httpStatusCode, err
+}
+
+//Delete repositorie by repoName and tag
+func (a api) DeleteRepo(authInfo usrInfo, repoName string, tag string) (int, error) {
+	_sling := sling.New().Delete(a.basePath)
+
+	path := "/api/repositories/"
+
+	_sling = _sling.Path(path)
+	type QueryParams struct {
+		RepoName string `url:"repo_name"`
+		Tag      string `url:"tag"`
+	}
+
+	_sling = _sling.QueryStruct(&QueryParams{RepoName: repoName, Tag: tag})
 	httpStatusCode, _, err := request(_sling, jsonAcceptHeader, authInfo)
 	return httpStatusCode, err
 }

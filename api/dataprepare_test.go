@@ -28,6 +28,7 @@ const (
 	TestUserEmail  = "testUser0001@mydomain.com"
 	TestProName    = "testProject0001"
 	TestTargetName = "testTarget0001"
+	TestPolicyName = "testPolicy0001"
 )
 
 func CommonAddUser() {
@@ -103,4 +104,29 @@ func CommonDelTarget() {
 
 func CommonPolicyEabled(policyID int, enabled int) {
 	_ = dao.UpdateRepPolicyEnablement(int64(policyID), enabled)
+}
+
+func CommonAddPolicy() {
+	//add target
+	CommonAddTarget()
+	targetID := int64(CommonGetTarget())
+	commonPolicy := &models.RepPolicy{
+		ProjectID: 1,
+		TargetID:  targetID,
+		Name:      TestPolicyName,
+	}
+	_, _ = dao.AddRepPolicy(*commonPolicy)
+}
+
+func CommonGetPolicy() int64 {
+	policies, _ := dao.FilterRepPolicies(TestPolicyName, int64(1))
+	return policies[0].ID
+}
+
+func CommonDelPolicy() {
+	//delete target
+	CommonDelTarget()
+
+	policies, _ := dao.FilterRepPolicies(TestPolicyName, int64(1))
+	_ = dao.DeleteRepPolicy(policies[0].ID)
 }

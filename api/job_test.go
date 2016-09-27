@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"testing"
 )
 
@@ -13,7 +14,10 @@ func TestJobsGet(t *testing.T) {
 	assert := assert.New(t)
 	apiTest := newHarborAPI()
 
-	jobsParams := &JobsParams{PolicyID: "1"}
+	CommonAddPolicy()
+	policyID := strconv.Itoa(int(CommonGetPolicy()))
+
+	jobsParams := &JobsParams{PolicyID: policyID}
 
 	fmt.Println("Testing Jobs Get API")
 
@@ -45,8 +49,11 @@ func TestJobsGet(t *testing.T) {
 	} else {
 		assert.Equal(int(400), httpStatusCode, "httpStatusCode should be 400")
 	}
+	CommonDelPolicy()
 
 }
+
+/*
 func TestJobLogsGet(t *testing.T) {
 	var httpStatusCode int
 	var err error
@@ -77,5 +84,6 @@ func TestJobLogsGet(t *testing.T) {
 	} else {
 		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 404")
 	}
-
+	CommonDelPolicy()
 }
+*/
