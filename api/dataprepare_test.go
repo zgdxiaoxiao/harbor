@@ -19,6 +19,7 @@ import (
 	"github.com/vmware/harbor/dao"
 	"github.com/vmware/harbor/models"
 	"os"
+	"os/exec"
 )
 
 const (
@@ -129,4 +130,12 @@ func CommonDelPolicy() {
 
 	policies, _ := dao.FilterRepPolicies(TestPolicyName, int64(1))
 	_ = dao.DeleteRepPolicy(policies[0].ID)
+}
+
+func CommonPushImage() {
+	repoPath := os.Getenv("MYSQL_HOST") + ":5000"
+	//get string of repository/tag
+	repo := repoPath + "/library/hello-world:latest"
+	cmd := exec.Command("docker push", repo)
+	_ = cmd.Run()
 }

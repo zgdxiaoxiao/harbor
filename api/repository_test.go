@@ -183,3 +183,66 @@ func TestGetReposTop(t *testing.T) {
 
 	fmt.Printf("\n")
 }
+
+func TestDelRepos(t *testing.T) {
+	var httpStatusCode int
+	var err error
+	var repoName string
+
+	tag := "latest"
+	assert := assert.New(t)
+	apiTest := newHarborAPI()
+
+	fmt.Println("Testing Repos Delete API")
+	//-------------------case 1 : response code = 200------------------------//
+	fmt.Println("case 1 : response code = 200")
+
+	repoName = "library/hello-world"
+	httpStatusCode, err = apiTest.DeleteRepo(*admin, repoName, tag)
+	if err != nil {
+		t.Error("Error while delete  repository ", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	}
+	//-------------------case 2 : response code = 404------------------------//
+	fmt.Println("case 2 : response code = 404, project does not exist")
+
+	repoName = "li/hello-world"
+	httpStatusCode, err = apiTest.DeleteRepo(*admin, repoName, tag)
+	if err != nil {
+		t.Error("Error while delete  repository ", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 404")
+	}
+	//-------------------case 3 : response code = 404------------------------//
+	fmt.Println("case 3 : response code = 404,repository name not known to registry")
+
+	repoName = "library/1111"
+	tag = ""
+	httpStatusCode, err = apiTest.DeleteRepo(*admin, repoName, tag)
+	if err != nil {
+		t.Error("Error while delete  repository ", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(404), httpStatusCode, "httpStatusCode should be 404")
+	}
+	//-------------------case 4 : response code = 401------------------------//
+	fmt.Println("case 3 : response code = 401,User need log in first.")
+
+	repoName = "library/docker"
+	tag = "latest"
+	httpStatusCode, err = apiTest.DeleteRepo(*unknownUsr, repoName, tag)
+	if err != nil {
+		t.Error("Error while delete  repository ", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(int(401), httpStatusCode, "httpStatusCode should be 401")
+	}
+
+	fmt.Printf("\n")
+
+	//push image:hello-world
+	CommonPushImage()
+}
