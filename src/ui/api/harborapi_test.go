@@ -120,7 +120,10 @@ func request(_sling *sling.Sling, acceptHeader string, authInfo ...usrInfo) (int
 //@param q Search parameter for project and repository name.
 //@return []Search
 //func (a testapi) SearchGet (q string) (apilib.Search, error) {
-func (a testapi) SearchGet(q string) (apilib.Search, error) {
+func (a testapi) SearchGet(q string, authInfo ...usrInfo) (int, apilib.Search, error) {
+	var httpCode int
+	var body []byte
+	var err error
 
 	_sling := sling.New().Get(a.basePath)
 
@@ -134,10 +137,15 @@ func (a testapi) SearchGet(q string) (apilib.Search, error) {
 
 	_sling = _sling.QueryStruct(&QueryParams{Query: q})
 
-	_, body, err := request(_sling, jsonAcceptHeader)
+	if len(authInfo) > 0 {
+		httpCode, body, err = request(_sling, jsonAcceptHeader, authInfo[0])
+	} else {
+		httpCode, body, err = request(_sling, jsonAcceptHeader)
+	}
+
 	var successPayload = new(apilib.Search)
 	err = json.Unmarshal(body, &successPayload)
-	return *successPayload, err
+	return httpCode, *successPayload, err
 }
 
 //Create a new project.
