@@ -17,6 +17,8 @@ func TestSearch(t *testing.T) {
 
 	//-------------case 1 : Response Code  = 200, Not sysAdmin --------------//
 	httpStatusCode, result, err := apiTest.SearchGet("library")
+
+	fmt.Println(result)
 	if err != nil {
 		t.Error("Error while search project or repository", err.Error())
 		t.Log(err)
@@ -29,6 +31,7 @@ func TestSearch(t *testing.T) {
 
 	//-------------case 2 : Response Code  = 200, sysAdmin ------------------//
 	httpStatusCode, result, err = apiTest.SearchGet("docker", *admin)
+	fmt.Println(result)
 	if err != nil {
 		t.Error("Error while search project or repository", err.Error())
 		t.Log(err)
